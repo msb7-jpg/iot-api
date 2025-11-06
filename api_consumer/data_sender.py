@@ -21,7 +21,7 @@ logger = logging.getLogger("data_sender")
 class ServerDataSender:
     def __init__(
         self,
-        api_url: str = "http://host.docker.internal:8000",
+        api_url: str = "http://app:8000",
         frequency: float = 1.0,
         num_servers: int = 1,
         username: str = "admin",
@@ -51,11 +51,21 @@ class ServerDataSender:
     async def initialize(self):
         """Initialize HTTP session, authenticate, and register servers."""
         self.session = aiohttp.ClientSession()
-        
-        # Authenticate first
-        self.auth_token = await self._authenticate()
+        # Authenticate first with retry/backoff so we wait for the API to become ready
+        max_attempts = 15
+        backoff_seconds = 2
+        attempt = 0
+        while attempt < max_attempts:
+            self.auth_token = await self._authenticate()
+            if self.auth_token:
+                break
+            attempt += 1
+            logger.warning(f"Authentication attempt {attempt}/{max_attempts} failed, retrying in {backoff_seconds}s...")
+            await asyncio.sleep(backoff_seconds)
+
         if not self.auth_token:
-            logger.error("Failed to authenticate. Exiting.")
+            logger.error("Failed to authenticate after retries. Exiting.")
+            await self.cleanup()
             return False
             
         # Register servers
@@ -95,6 +105,7 @@ class ServerDataSender:
                     logger.error(f"Failed to register user. Status: {response.status}, Response: {error_text}")
                     return None
         except Exception as e:
+            # Network errors or connection refused will be retried by the caller
             logger.error(f"Exception during user registration: {e}")
             
         # Now login to get the token
@@ -118,6 +129,7 @@ class ServerDataSender:
                     logger.error(f"Failed to login. Status: {response.status}, Response: {error_text}")
                     return None
         except Exception as e:
+            # Network errors or connection refused will be retried by the caller
             logger.error(f"Exception during login: {e}")
             return None
     

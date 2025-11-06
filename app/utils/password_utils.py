@@ -3,7 +3,11 @@ from passlib.context import CryptContext
 This module is used to decouple the auth service from user service
 it serves as an interface between these two services
 """
-password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Use a scheme that doesn't require the external 'bcrypt' C-extension to avoid
+# runtime issues in environments where the 'bcrypt' package is missing or incompatible.
+# pbkdf2_sha256 is a secure, widely supported scheme implemented in pure Python
+# via passlib and avoids bcrypt's 72-byte password limit.
+password_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 def get_password_hash(password: str) -> str:
     return password_context.hash(password)

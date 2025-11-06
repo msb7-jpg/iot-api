@@ -31,7 +31,7 @@ services:
       - app
       - db
     environment:
-     - API_URL=host.docker.internal:8000   # Use o nome do serviço "app" para se referir ao endereço do backend
+      - API_URL=http://app:8000   # Use the service name "app" (Compose DNS) to reach the backend from this container
 
   db:
     image: postgres:15-alpine
